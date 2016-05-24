@@ -1,6 +1,4 @@
 import numpy as np
-from scipy import stats
-import MySQLdb as mdb
 
 # ports config is :
 #        1
@@ -66,6 +64,7 @@ class AbsentStrat(Exception):
     def __str__(self):
         return repr(self.msg)
 
+
 class RandomBet(object):
     # previous trial configuration
     # pre_config = [fix_port, surebet_port, lottery_port]
@@ -92,7 +91,7 @@ class RandomBet(object):
     def action(self):
         # agent poke a port based on its strategy
         choice = range(1, 10)
-        choice.remove[self.cur_fixport]
+        choice.remove(self.cur_fixport)
         self.cur_action = choice[np.random.randint(0, 8)]
         return self.cur_action
 
@@ -107,7 +106,7 @@ class RandomBet(object):
             p = np.random.random() <= lottery_prob
             self.cur_reward = lottery_max_reward*p
 
-        elif self.cur_action == self.surebetport:
+        elif self.cur_action == self.cur_surebetport:
             self.cur_reward = surebet_reward
 
         else:
@@ -118,7 +117,6 @@ class RandomBet(object):
         return self.cur_reward, self.cur_delta_reward
 
 
-# SameSide
 class SameSide(RandomBet):
     def __init__(self,
                  pre_config, cur_config,
@@ -229,3 +227,42 @@ class Utility(RandomBet):
         return self.cur_action
 
 
+class WinLoseShift(RandomBet):
+    def __init__(self,
+                 pre_config, cur_config,
+                 pre_action, pre_reward, pre_delta_reward):
+        super(WinLoseShift, self).__init__(pre_config,
+                                           cur_config,
+                                           pre_action,
+                                           pre_reward,
+                                           pre_delta_reward)
+
+    def action(self, kappa):
+        if self.pre_delta_reward <= 0:
+            if self.pre_action == self.pre_lotteryport:
+                self.cur_action = self.cur_surebetport
+            elif self.pre_action == self.pre_surebetport:
+                self.cur_action = self.cur_lotteryport
+            else:
+                self.cur_action = self.cur_fixport
+
+        else:
+            prob_stay = np.exp(-kappa*self.pre_delta_reward)
+            if self.pre_action == self.pre_lotteryport:
+                arandnum = np.random.random()
+                if arandnum < prob_stay:
+                    self.cur_action = self.cur_lotteryport
+                else:
+                    self.cur_action = self.cur_surebetport
+
+            elif self.pre_action == self.pre_surebetport:
+                arandnum = np.random.random()
+                if arandnum < prob_stay:
+                    self.cur_action = self.cur_surebetport
+                else:
+                    self.cur_action = self.cur_lotteryport
+
+            else:
+                self.cur_action = self.cur_fixport
+
+        return self.cur_action
