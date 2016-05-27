@@ -185,18 +185,51 @@ xs, ys = compute_xy(data)
 xs_unpack = xs.reshape((len(data)*NUM_PORTS, NUM_STRAT))
 ys_unpack = ys.reshape((len(data)*NUM_PORTS, 1))
 
-clf = linear_model.Ridge(alpha=.5)
-clf.fit(xs_unpack, ys_unpack)
-coeff_fit = clf.coef_.flatten()
+# clf = linear_model.Ridge(alpha=.5)
+# clf.fit(xs_unpack, ys_unpack)
+# coeff_fit = clf.coef_.flatten()
 
-prior_p = {'RandomBet': coeff_fit[0],
-           'SameSide': coeff_fit[1],
-           'SameChoice': coeff_fit[2],
-           'SameAction': coeff_fit[3],
-           'Utility': coeff_fit[4],
-           'WinLoseShift': coeff_fit[5]}
+# prior_p = {'RandomBet': coeff_fit[0],
+#            'SameSide': coeff_fit[1],
+#            'SameChoice': coeff_fit[2],
+#            'SameAction': coeff_fit[3],
+#            'Utility': coeff_fit[4],
+#            'WinLoseShift': coeff_fit[5]}
 
-for k, v in sorted(prior_p.items()):
-    print k, ":", v
+# for k, v in sorted(prior_p.items()):
+#     print k, ":", v
 
-#print clf.coef_, clf.intercept_
+import matplotlib.pyplot as plt
+
+alphas = np.arange(0, 100, 10)*0.5
+
+coeffs = np.zeros((len(alphas), 6))
+
+for i, a in enumerate(alphas):
+    clf = linear_model.Ridge(alpha=a)
+    clf.fit(xs_unpack, ys_unpack)
+    coeff_fit = clf.coef_.flatten()
+    coeffs[i] = coeff_fit
+    prior_p = {'RandomBet': coeff_fit[0],
+               'SameSide': coeff_fit[1],
+               'SameChoice': coeff_fit[2],
+               'SameAction': coeff_fit[3],
+               'Utility': coeff_fit[4],
+               'WinLoseShift': coeff_fit[5]}
+
+    print 'alpha: ', a, 'intercept: ', clf.intercept_
+    print ''
+    for k, v in sorted(prior_p.items()):
+        print k, ":", v
+
+plt.figure()
+plt.plot(alphas, coeffs, '-o')
+legendmsg = ('randombet',
+             'sameside',
+             'samechoice',
+             'sameaction',
+             'utility',
+             'winloseshift')
+plt.legend(legendmsg, loc='upper left', bbox_to_anchor=(1, 1))
+plt.grid()
+plt.show()
