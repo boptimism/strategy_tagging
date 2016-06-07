@@ -145,7 +145,7 @@ class SameSide(RandomBet):
             choice = [self.cur_fixport]
 
         # choosing one port to poke
-        if len(choice) == 0:
+        if len(choice) == 1:
             self.cur_action = self.cur_fixport
         else:
             self.cur_action = choice[np.random.randint(0, len(choice))]
