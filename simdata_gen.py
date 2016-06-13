@@ -1,168 +1,117 @@
-from constant import *
+import simdata_gen_func as sfunc
+from scipy import stats
 import numpy as np
-# config:
-# config[0:3] = fix_port, surebet_port, lottery_port at t-1
-# config[3:6] = fix_port, surebet_port, lottery_port at t
-# pre_action: action taken by agent at t-1
-# pre_reward: reward taken by taking pre_action
+import MySQLdb as mdb
 
 
-def reward(poke, sure_port, lott_port, lott_mag, lott_prob, sure_mag):
-    if poke == lott_port:
-        arand = np.random.random()
-        if arand <= lott_prob:
-            return lott_mag
-        else:
-            return 0.0
-    elif poke == sure_port:
-        return sure_mag
-    else:
-        return 0.
+def trial_gen(prior,
+              config, pre_action, pre_reward,
+              lott_mag, lott_prob, sure_mag,
+              alpha, beta):
+    # generate trial by trial simulated data
+    # inputs:
+    # prior: prior prob of each strategy used, a dictionary
+    # config: 3 element list/array, in the order of
+    #         fix_port, sure_port, lott_port
+    # alpha, beta: parameters in evaluting utility curve
+
+    # the data has the following fields:
+    # fix_port, sure_port, lottery_port, action, reward, strategy,
+    # applicable, contribute_sure, contribute_lott
+
+    # randomize the strategy going to be used
+    strat_prob = np.array(sorted(prior.items()))
+    p = (strat_prob[:, 1]).astype(float)
+    s = strat_prob[:, 0]
+    idx = np.arange(6)
+    strat_gen = stats.rv_discrete(name='strat_gen', values=(idx, p))
+    s = strat_prob[strat_gen.rvs(), 0]
+    f = getattr(sfunc, s)
+    ac, re, app, contri = f(config, pre_action, pre_reward,
+                            lott_mag, lott_prob, sure_mag,
+                            alpha=alpha, beta=beta)
+
+    return ac, re, s, app, contri[0], contri[1]
 
 
-def randombet(config, pre_action, pre_reward,
-              lott_mag, lott_prob, sure_mag):
-    # agent is allowed to randomly pick one of the 9 ports
-    cur_sureport = config[4]
-    cur_lottport = config[5]
-    poke = np.random.randint(1, 10)
-    re = reward(poke, cur_sureport, cur_lottport,
-                lott_mag, lott_prob, sure_mag)
-    return poke, re
+if __name__ == '__main__':
+    num_trials = 10000
 
+    lott_mag = 10.
+    lott_prob = 0.5
+    sure_mag = 4.5
 
-def sameside(config, pre_action, pre_reward,
-             lott_mag, lott_prob, sure_mag):
-    # agent poke the port on the same side as the previous poke
-    # when this strategy is not viable, e.g. agent poked
-    # port on the right in previous trial, but is fixed at
-    # the rightmost port, this strategy is not valid.
-    # Agent will be left at the fixport under such situation.
-    pre_fixport = config[0]
-    cur_fixport = config[3]
-    if pre_action in LEFT[pre_fixport]:
-        choice = LEFT[cur_fixport]
-    elif pre_action in RIGHT[pre_fixport]:
-        choice = RIGHT[cur_fixport]
-    elif pre_action in UP[pre_fixport]:
-        choice = UP[cur_fixport]
-    elif pre_action in DOWN[pre_fixport]:
-        choice = DOWN[cur_fixport]
-    else:
-        choice = []
-    if len(choice) == 0:
-        poke = cur_fixport
-    else:
-        poke = choice[np.random.randint(len(choice))]
-    re = reward(poke, cur_sureport, cur_lottport,
-                lott_mag, lott_prob, sure_mag)
-    return poke, re
+    # initialize config, arbitrary
+    pre_config = [7, 6, 8]
+    pre_action = pre_config[1]
+    pre_reward = sure_mag
 
+    prior = {'randombet': 0.05,
+             'sameside': 0.1,
+             'samechoice': 0.1,
+             'sameaction': 0.05,
+             'utility': 0.6,
+             'winstayloseshift': 0.1}
 
-def samechoice(config, pre_action, pre_reward,
-               lott_mag, lott_prob, sure_mag):
-    # same choice:
-    # previously picked lottery, now pick lottery
-    # previously picked surebet, now pick surebet
-    # previously didn't pick any reward ports, now
-    # pick non-reward ports
-    pre_sureport = config[1]
-    pre_lottport = config[2]
-    cur_sureport = config[1]
-    cur_lottport = config[2]
-    non_reward_port = range(1, 10)
-    non_reward_port.remove(cur_lottport)
-    non_reward_port.remove(cur_sureport)
+    alpha = 1.0
+    beta = 1.0
+    # connect to SQL to record the trials
+    credentials = {}
+    with open('./credential_db.txt', 'r') as f:
+        for l in f:
+            fields = l.strip().split(":")
+            try:
+                credentials[fields[0]] = fields[1]
+            except:
+                pass
 
-    if pre_action == pre_sureport:
-        poke = cur_sureport
-    elif pre_action == pre_lottport:
-        poke = cur_lottport
-    else:
-        poke = non_reward_port[np.random.randint(7)]
+    con = mdb.connect(host=credentials['host'],
+                      user=credentials['user'],
+                      passwd=credentials['passwd'],
+                      db=credentials['db'])
 
-    re = reward(poke, cur_sureport, cur_lottport,
-                lott_mag, lott_prob, sure_mag)
-    return poke, re
+    cur = con.cursor()
+    sql_insertvals = """INSERT INTO strategy_tag2(
+                        fix_port,
+                        surebet_port,
+                        lottery_port,
+                        poke,
+                        reward,
+                        strategy,
+                        applicable,
+                        contribute_sure,
+                        contribute_lott) VALUES (
+                        "%d", "%d", "%d", "%d", "%f", "%s", "%d", "%f", "%f")
+                        """
+    # remove the previous records in SQL table.
+    # This is more for debugging purpose
+    sql_overwrite = "DELETE FROM strategy_tag2"
+    cur.execute(sql_overwrite)
+    sql_reset = "ALTER TABLE strategy_tag2 AUTO_INCREMENT = 1"
+    cur.execute(sql_reset)
+    try:
+        con.commit()
+    except:
+        con.rollback()
 
+    for i in range(num_trials):
+        applicable = 0
+        # strategy is employed only when it is applicable
+        while not applicable:
+            cur_config = list(np.random.choice(range(1, 10), 3, replace=False))
+            config = pre_config + cur_config
+            results = trial_gen(prior,
+                                config, pre_action, pre_reward,
+                                lott_mag, lott_prob, sure_mag,
+                                alpha, beta)
+            applicable = results[3]
 
-def sameaction(config, pre_action, pre_reward,
-               lott_mag, lott_prob, sure_mag):
-    # agent simply poke the same port
-    poke = pre_action
-    re = reward(poke, cur_sureport, cur_lottport,
-                lott_mag, lott_prob, sure_mag)
-    return poke, re
+        pre_config = cur_config
+        pre_action = results[0]
+        pre_reward = results[1]
 
+        inputs = cur_config + list(results)
+        sql_insert = sql_insertvals % tuple(inputs)
+        cur.execute(sql_insert)
 
-def utility(config, pre_action, pre_reward,
-            lott_mag, lott_prob, sure_mag,
-            alpha, beta):
-    # agent uses utility curve to choose one of the following
-    # 1) lottery
-    # 2) sure
-    # if the previous poke is not one of the two reward ports
-    # this strategy is not applicable. Agent stays where
-    # it is fixed.
-    pre_sureport = config[1]
-    pre_lottport = config[2]
-    cur_fixport = config[3]
-    cur_sureport = config[4]
-    cur_lottport = config[5]
-    if pre_action not in [pre_sureport, pre_lottport]:
-        poke = cur_fixport
-        re = reward(poke, cur_sureport, cur_lottport,
-                    lott_mag, lott_prob, sure_mag)
-        return poke, re
-    ulott = lott_mag**alpha * lott_prob
-    usure = sure_mag**alpha
-    plott = 1./(1.+np.exp(-beta*(ulott-usure)))
-    arand = np.random.random()
-    if arand < plott:
-        poke = cur_lottport
-        re = reward(poke, cur_sureport, cur_lottport,
-                    lott_mag, lott_prob, sure_mag)
-        return poke, re
-    else:
-        poke = cur_sureport
-        re = reward(poke, cur_sureport, cur_lottport,
-                    lott_mag, lott_prob, sure_mag)
-        return poke, re
-
-
-def winstayloseshift(config, pre_action, pre_reward,
-                     lott_mag, lott_prob, sure_mag,
-                     alpha, beta):
-    # win-stay-lose-shift:
-    # if pick surebet, stays, since it always gives win
-    # if pick lottery, but previous lottery doesn't
-    # generate reward, switch.
-    # if previous pick is not in the reward ports,
-    # this strategy is not applicable
-    pre_sureport = config[1]
-    pre_lottport = config[2]
-    cur_fixport = config[3]
-    cur_sureport = config[4]
-    cur_lottport = config[5]
-    if pre_action not in [pre_sureport, pre_lottport]:
-        poke = cur_fixport
-        re = reward(poke, cur_sureport, cur_lottport,
-                    lott_mag, lott_prob, sure_mag)
-        return poke, re
-    if pre_action == pre_sureport:
-        assert pre_reward == sure_mag
-        poke = cur_sureport
-        re = reward(poke, cur_sureport, cur_lottport,
-                    lott_mag, lott_prob, sure_mag)
-        return poke, re
-    else:
-        if pre_reward > 0:
-            poke = cur_lottport
-            re = reward(poke, cur_sureport, cur_lottport,
-                        lott_mag, lott_prob, sure_mag)
-            return poke, re
-        else:
-            poke = cur_sureport
-            re = reward(poke, cur_sureport, cur_lottport,
-                        lott_mag, lott_prob, sure_mag)
-            return poke, re
+    con.close()
