@@ -44,8 +44,11 @@ if __name__ == '__main__':
     cur.execute(sqlcmd)
     records = cur.fetchall()
 
-    prior = {'randombet': 0.2,
-             'utility': 0.8}
+    prior = {'randombet': 0.1,
+             'sameport': 0.1,
+             'samebet': 0.1,
+             'winstayloseshift': 0.1,
+             'utility': 0.6}
 
     alpha = 1.5
     beta = 1.0

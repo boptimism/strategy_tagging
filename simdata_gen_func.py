@@ -47,3 +47,84 @@ def utility(config,
     re = reward(poke, cur_sureport, cur_lottport,
                 lott_mag, lott_prob, sure_mag)
     return poke, re
+
+
+def sameport(history,
+             lott_mag, lott_prob, sure_mag,
+             alpha=0.0, beta=0.0):
+    # animal keep poking at the same port
+    # history: a list, latest 2 trials
+    #          [pre_fixport, pre_sure, pre_lottery,
+    #           pre_poke, pre_reward,
+    #           cur_fixport, cur_sure, cur_lottery]
+    # ---------------------------------------------
+    # IMPORTANT: only this strategy allows animal
+    # to poke an unrewarding port.
+    pre_poke = history[3]
+    cur_sureport = history[-2]
+    cur_lottport = history[-1]
+    poke = pre_poke
+    if poke in [cur_sureport, cur_lottport]:
+        re = reward(poke, cur_sureport, cur_lottport,
+                    lott_mag, lott_prob, sure_mag)
+        return poke, re
+    else:
+        return None
+
+
+def samebet(history,
+            lott_mag, lott_prob, sure_mag,
+            alpha=0.0, beta=0.0):
+    # if animal poke sure_port/lott_port in previous trial
+    # animal will poke sure_port/lott_port in current trial
+    pre_poke = history[3]
+    pre_sureport = history[1]
+    pre_lottport = history[2]
+    cur_sureport = history[-2]
+    cur_lottport = history[-1]
+    if pre_poke == pre_sureport:
+        poke = cur_sureport
+    elif pre_poke == pre_lottport:
+        poke = cur_lottport
+    else:
+        return None
+    re = reward(poke, cur_sureport, cur_lottport,
+                lott_mag, lott_prob, sure_mag)
+    return poke, re
+
+
+def winstayloseshift(history,
+                     lott_mag, lott_prob, sure_mag,
+                     alpha=0.0, beta=0.0):
+    # win-stay/lose-shift
+    # if animal went to sure bet in previous trial,
+    # it will stay in sure bet
+    # else if animal went to lottery, and gain reward,
+    # it will stay in lottery
+    # else if animal went to lottery, but gain nothing,
+    # it will switch to sure bet
+    pre_poke = history[3]
+    pre_reward = history[4]
+    pre_sureport = history[1]
+    pre_lottport = history[2]
+    cur_sureport = history[-2]
+    cur_lottport = history[-1]
+    if pre_poke == pre_sureport:
+        poke = cur_sureport
+        re = reward(poke, cur_sureport, cur_lottport,
+                    lott_mag, lott_prob, sure_mag)
+        return poke, re
+
+    elif pre_poke == pre_lottport:
+        if pre_reward > 0:
+            poke = cur_lottport
+            re = reward(poke, cur_sureport, cur_lottport,
+                        lott_mag, lott_prob, sure_mag)
+            return poke, re
+        else:
+            poke = cur_sureport
+            re = reward(poke, cur_sureport, cur_lottport,
+                        lott_mag, lott_prob, sure_mag)
+            return poke, re
+    else:
+        return None
