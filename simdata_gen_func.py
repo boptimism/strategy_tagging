@@ -14,10 +14,15 @@ def reward(poke, sure_port, lott_port, lott_mag, lott_prob, sure_mag):
         return 0.
 
 
-def randombet(config,
+def randombet(history,
               lott_mag, lott_prob, sure_mag,
               alpha=0.0, beta=0.0):
     # randomly pick from 2 ports
+    # history: a list, latest 2 trials
+    #          [pre_fixport, pre_sure, pre_lottery,
+    #           pre_poke, pre_reward,
+    #           cur_fixport, cur_sure, cur_lottery]
+    config = history[-3:]
     cur_sureport = config[1]
     cur_lottport = config[2]
     arand = np.random.random()
@@ -30,9 +35,10 @@ def randombet(config,
     return poke, re
 
 
-def utility(config,
+def utility(history,
             lott_mag, lott_prob, sure_mag,
             alpha=0.0, beta=0.0):
+    config = history[-3:]
     cur_sureport = config[1]
     cur_lottport = config[2]
     # utility: p*v^alpha
@@ -63,8 +69,8 @@ def sameport(history,
     pre_poke = history[3]
     cur_sureport = history[-2]
     cur_lottport = history[-1]
-    poke = pre_poke
-    if poke in [cur_sureport, cur_lottport]:
+    if pre_poke in [cur_sureport, cur_lottport]:
+        poke = pre_poke
         re = reward(poke, cur_sureport, cur_lottport,
                     lott_mag, lott_prob, sure_mag)
         return poke, re

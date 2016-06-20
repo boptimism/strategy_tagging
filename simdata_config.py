@@ -21,7 +21,7 @@ if __name__ == '__main__':
                 sure_mag) VALUES(
                 "%d", "%d", "%d", "%f", "%f", "%f")"""
     # number of trials
-    num_trial = 20000
+    num_trial = 50000
     # number of lottery mag e.g. 1-10
     num_lott_mag = 20
     lott_mag_start = 4.0
