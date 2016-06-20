@@ -26,10 +26,10 @@ def trial_gen(prior, history,
     strat_gen = stats.rv_discrete(name='strat_gen', values=(idx, p))
     s = strat_prob[strat_gen.rvs(), 0]
     f = getattr(sfunc, s)
-    result = f(history,
-               lott_mag, lott_prob, sure_mag,
-               alpha=alpha0, beta=beta0)
-    return result, s
+    poke, re = f(history,
+                 lott_mag, lott_prob, sure_mag,
+                 alpha=alpha0, beta=beta0)
+    return poke, re, s
 
 
 if __name__ == '__main__':
@@ -45,9 +45,9 @@ if __name__ == '__main__':
     records = cur.fetchall()
     # chose initial bet to be lottery
     # initial reward = 0
-    pre_poke = records[0][3]
+    pre_poke = records[0][2]
     pre_reward = 0.0
-    pre_config = records[0][1:4] + (pre_poke, pre_reward)
+    pre_config = records[0][1:3] + (pre_poke, pre_reward)
     pre_trialid = 1
 
     prior = {'randombet': 0.1,
@@ -70,30 +70,18 @@ if __name__ == '__main__':
 
     for rec in records[1:]:
         trialid = rec[0]
-        cur_config = rec[1:4]
+        cur_config = rec[1:3]
         history = pre_config + cur_config
-        lott_mag = rec[4]
-        lott_prob = rec[5]
-        sure_mag = rec[6]
-        poke_reward = None
-        while poke_reward is None:
-            # if the result is none, e.g.
-            # animal poked un-rewarding port
-            # strategy sampling will keep going.
-            # this results in the lower likelihood of
-            # sameport strategy than originally designed.
-            res = trial_gen(prior, history,
-                            lott_mag,
-                            lott_prob,
-                            sure_mag,
-                            alpha,
-                            beta)
-            poke_reward = res[0]
-            strategy_used = res[1]
-        poke = poke_reward[0]
-        reward = poke_reward[1]
-        strat = strategy_used
-        pre_config = cur_config + (poke, reward)
-        sqlcmd = sqlstr % (trialid, poke, reward, strat)
+        lott_mag = rec[3]
+        lott_prob = rec[4]
+        sure_mag = rec[5]
+        poke, re, strat = trial_gen(prior, history,
+                                    lott_mag,
+                                    lott_prob,
+                                    sure_mag,
+                                    alpha,
+                                    beta)
+        pre_config = cur_config + (poke, re)
+        sqlcmd = sqlstr % (trialid, poke, re, strat)
         cur.execute(sqlcmd)
     con.close()

@@ -4,7 +4,7 @@ import numpy as np
 from scipy import optimize as opt
 
 NUM_STRATEGY = 5
-NUM_PORTS = 3
+NUM_PORTS = 2
 
 
 def prob_poke(coeff, alpha, beta, external):
@@ -14,10 +14,10 @@ def prob_poke(coeff, alpha, beta, external):
     # history: a list contains:
     # pre_fix, pre_sure, pre_lott, pre_poke, pre_reward,
     # cur_fix, cur_sure, cur_lott
-    history = external[0:8]
-    lott_mag = external[8]
-    lott_prob = external[9]
-    sure_mag = external[10]
+    history = external[0:6]
+    lott_mag = external[6]
+    lott_prob = external[7]
+    sure_mag = external[8]
     p1 = pfunc.randombet()
     p2 = pfunc.utility(history,
                        lott_mag, lott_prob, sure_mag,
@@ -35,9 +35,9 @@ def prob_poke(coeff, alpha, beta, external):
 def cross_ent_loss(x, y):
     # x: coeff , alpha, beta
     # y: external controls
-    #    a matrix with dimension n_trial X 8
+    #    a matrix with dimension n_trial X 7
     #    each row consists of :
-    #    fix_port, sure_port, lottery_port, poke, reward,
+    #    sure_port, lottery_port, poke, reward,
     #    lott_mag, lott_prob, sure_mag
     eps = 1.e-15
     coeff = np.abs(x[:NUM_STRATEGY])/sum(np.abs(x[:NUM_STRATEGY]))
@@ -46,18 +46,13 @@ def cross_ent_loss(x, y):
     entloss = 0.0
     y0 = y[0]
     for yi in y[1:]:
-        p_i = yi[3]  # p_i: actually poke
-        external = y0[:5] + yi[:3] + yi[-3:]
+        p_i = yi[2]  # p_i: actually poke
+        external = y0[:4] + yi[:2] + yi[-3:]
         q_i = prob_poke(coeff, alpha, beta, external)
-        # -- remove fixport from p_vec
         p_vec = np.zeros(NUM_PORTS)
         p_vec[p_i] = 1.0
-        mask = np.ones(len(p_vec), dtype=bool)
-        mask[yi[0]] = False
-        ps = p_vec[mask]
-        # --
-        loss = np.dot(ps, np.log(q_i+eps))\
-            + np.dot(1.-ps, np.log(1.-q_i + eps))
+        loss = np.dot(p_vec, np.log(q_i+eps))\
+            + np.dot(1.-p_vec, np.log(1.-q_i + eps))
         entloss = entloss + loss
         y0 = yi
     entloss = -entloss/len(y)
@@ -66,7 +61,7 @@ def cross_ent_loss(x, y):
 
 def callbackF(x):
     likelyhood = np.abs(x[:NUM_STRATEGY])/sum(np.abs(x[:NUM_STRATEGY]))
-    x_check = list(likelyhood) + [x[2], x[3]]
+    x_check = list(likelyhood) + [x[-2], x[-1]]
     print '{0:<8.3f} \
            {1:<8.3f} \
            {2:<8.3f} \
@@ -79,7 +74,7 @@ def callbackF(x):
 if __name__ == "__main__":
     cur, con = dbc.connect()
     sqlcmd = """SELECT
-                a.fix_port, a.surebet_port, a.lottery_port,
+                a.surebet_port, a.lottery_port,
                 b.poke, b.reward,
                 a.lottery_mag, a.lottery_prob, a.sure_mag
                 FROM config AS a
@@ -98,7 +93,7 @@ if __name__ == "__main__":
                 'utility',
                 'samebet',
                 'sameport',
-                'winstayloseshift',
+                'wsls',
                 'alpha',
                 'beta')
     print '{0:8s} \
@@ -118,5 +113,7 @@ if __name__ == "__main__":
                        method=methds,
                        callback=callbackF,
                        options=methds_opt)
-
     print res.x
+    p_f = res.x
+    print "Finaly Results:"
+    print list(np.abs(p_f[:5])/sum(np.abs(p_f[:5]))) + list(p_f[5:])
