@@ -2,6 +2,7 @@ import db_connect as dbc
 import simdata_postproc_func as pfunc
 import numpy as np
 from scipy import optimize as opt
+import time
 
 NUM_STRATEGY = 5
 NUM_PORTS = 2
@@ -87,6 +88,8 @@ if __name__ == "__main__":
 
     data = (records,)
 
+    t0 = time.time()
+
     methds = 'SLSQP'
     print "methods: ", methds
     fieldstr = ('random',
@@ -113,7 +116,11 @@ if __name__ == "__main__":
                        method=methds,
                        callback=callbackF,
                        options=methds_opt)
+
+    t1 = time.time()
+
     print res.x
     p_f = res.x
     print "Finaly Results:"
     print list(np.abs(p_f[:5])/sum(np.abs(p_f[:5]))) + list(p_f[5:])
+    print "time used: ", t1-t0

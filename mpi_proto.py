@@ -40,4 +40,11 @@ if __name__ == '__main__':
         idx = []
 
     idx_rank = comm.scatter(idx, root=ROOT)
-    print [rank] + list(idx_rank)
+    mappings = np.sum(np.sin(idx_rank))
+    print rank, mappings
+
+    sin_map = np.zeros(4)
+    sin_map = comm.gather(mappings, root=0)
+
+    if rank == 0:
+        print sin_map
