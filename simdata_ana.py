@@ -81,8 +81,8 @@ def read_trials():
                 a.surebet_port, a.lottery_port,
                 b.poke, b.reward,
                 a.lottery_mag, a.lottery_prob, a.sure_mag
-                FROM config AS a
-                JOIN results AS b
+                FROM strattag_config AS a
+                JOIN strattag_pokereward AS b
                 ON a.trialid=b.trialid
                 """
     cur.execute(sqlcmd)
@@ -105,7 +105,7 @@ if __name__ == "__main__":
         rank, t1-t0)
 
     num_samples_total = len(records)
-    sqlstr = """INSERT INTO p_results(
+    sqlstr = """INSERT INTO strattag_fitting(
                 rank,
                 num_samples,
                 fitting_time,
@@ -124,7 +124,10 @@ if __name__ == "__main__":
     fitperprocs = [4, 2]
     # connect to db to record the fittings
     cur, con = dbc.connect()
-    dbc.overwrite(cur, con, 'p_results')
+    dbc.overwrite(cur, con, 'strattag_fitting')
+
+    fitting_time_total = 0.0
+    writetodb_time_total = 0.0
 
     for sample_size, fit_per_proc in zip(samplesizes, fitperprocs):
         sample_per_proc = sample_size*fit_per_proc
@@ -174,20 +177,24 @@ if __name__ == "__main__":
             fitting = res.x
             fitting[:5] = np.abs(fitting[:5])/sum(np.abs(fitting[:5]))
             fit_time = t5-t4
+
+            fitting_time_total += fit_time
+
             sql_ins = (rank, sample_size, fit_time) + tuple(fitting)
             sqlcmd = sqlstr % sql_ins
-            cur.execute(sqlcmd)
-            # print 'rank {0:2d}, fitting time {1:.1f}'.format(rank, fit_time)
-            # para_s = [rank, sample_size] +\
-            #     ['{:.3f}'.format(x) for x in fitting]
-            # print para_s
 
-        # fit_para_allranks = comm.gather(fitting, root=ROOT)
-        # fit_t_allranks = comm.gather(fit_time, root=ROOT)
-        # if rank == ROOT:
-        #     for i, fits in enumerate(fit_para_allranks):
-        #         print 'rank: ', i,\
-        #               ' paras: ', fits,\
-        #           'time: ', fit_t_allranks[i]
+            t6 = time.time()
+            cur.execute(sqlcmd)
+            t7 = time.time()
+            writetodb_time_total += (t7-t6)
+
+    print 'rank {0:2d}: \
+           Total Fitting {1:.1f}, \
+           Total Write2DB {2:.1f}, \
+           Write/Fit {3:.4f}'.\
+        format(rank,
+               fitting_time_total,
+               writetodb_time_total,
+               writetodb_time_total/fitting_time_total)
     con.close()
     MPI.Finalize()

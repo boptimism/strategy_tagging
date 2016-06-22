@@ -35,12 +35,12 @@ def trial_gen(prior, history,
 if __name__ == '__main__':
     cur, con = dbc.connect()
     try:
-        cur.execute("DELETE FROM results")
+        cur.execute("DELETE FROM strattag_pokereward")
         con.commit()
     except:
         con.rollback()
 
-    sqlcmd = 'SELECT * FROM config'
+    sqlcmd = 'SELECT * FROM strattag_config'
     cur.execute(sqlcmd)
     records = cur.fetchall()
     # chose initial bet to be lottery
@@ -50,16 +50,16 @@ if __name__ == '__main__':
     pre_config = records[0][1:3] + (pre_poke, pre_reward)
     pre_trialid = 1
 
-    prior = {'randombet': 0.1,
-             'sameport': 0.1,
+    prior = {'randombet': 0.15,
+             'sameport': 0.05,
              'samebet': 0.1,
-             'winstayloseshift': 0.1,
-             'utility': 0.6}
+             'winstayloseshift': 0.075,
+             'utility': 0.625}
 
-    alpha = 1.5
-    beta = 1.0
+    # alpha = 1.5
+    # beta = 1.0
 
-    sqlstr = """INSERT INTO results(
+    sqlstr = """INSERT INTO strattag_pokereward(
                 trialid,
                 poke,
                 reward,
@@ -69,6 +69,8 @@ if __name__ == '__main__':
     cur.execute(sqlcmd)
 
     for rec in records[1:]:
+        alpha = rec[-2]
+        beta = rec[-1]
         trialid = rec[0]
         cur_config = rec[1:3]
         history = pre_config + cur_config
