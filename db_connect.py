@@ -18,3 +18,11 @@ def connect():
 
     cur = con.cursor()
     return cur, con
+
+
+def overwrite(cur, con, tbl_name):
+    try:
+        cur.execute("DELETE FROM %s" % tbl_name)
+        con.commit()
+    except:
+        con.rollback()

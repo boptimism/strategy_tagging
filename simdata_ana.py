@@ -3,7 +3,10 @@ import simdata_postproc_func as pfunc
 import numpy as np
 from scipy import optimize as opt
 import time
+from mpi4py import MPI
+import sys
 
+ROOT = 0
 NUM_STRATEGY = 5
 NUM_PORTS = 2
 
@@ -72,7 +75,7 @@ def callbackF(x):
            {6:<8.3f}'.format(*x_check)
 
 
-if __name__ == "__main__":
+def read_trials():
     cur, con = dbc.connect()
     sqlcmd = """SELECT
                 a.surebet_port, a.lottery_port,
@@ -85,42 +88,106 @@ if __name__ == "__main__":
     cur.execute(sqlcmd)
     records = cur.fetchall()
     con.close()
+    return records
 
-    data = (records,)
+
+if __name__ == "__main__":
+    comm = MPI.COMM_WORLD
+    numtask = comm.Get_size()
+    rank = comm.Get_rank()
+
+    # read SQL db from multiple processor
 
     t0 = time.time()
-
-    methds = 'SLSQP'
-    print "methods: ", methds
-    fieldstr = ('random',
-                'utility',
-                'samebet',
-                'sameport',
-                'wsls',
-                'alpha',
-                'beta')
-    print '{0:8s} \
-           {1:8s} \
-           {2:8s} \
-           {3:8s} \
-           {4:8s} \
-           {5:8s} \
-           {6:8s}'.format(*fieldstr)
-
-    paras = tuple([0.5]*NUM_STRATEGY) + (2.0, 0.5)
-
-    methds_opt = {'disp': True}
-    res = opt.minimize(cross_ent_loss,
-                       paras,
-                       args=data,
-                       method=methds,
-                       callback=callbackF,
-                       options=methds_opt)
-
+    records = read_trials()
     t1 = time.time()
+    print 'rank {0:2d} sql-reading takes {1:.1f} sec'.format(
+        rank, t1-t0)
 
-    print res.x
-    p_f = res.x
-    print "Finaly Results:"
-    print list(np.abs(p_f[:5])/sum(np.abs(p_f[:5]))) + list(p_f[5:])
-    print "time used: ", t1-t0
+    num_samples_total = len(records)
+    sqlstr = """INSERT INTO p_results(
+                rank,
+                num_samples,
+                fitting_time,
+                random,
+                utility,
+                samebet,
+                sameport,
+                wsls,
+                alpha,
+                beta) VALUES(
+                "%d", "%d", "%f", "%f", "%f", "%f", "%f", "%f", "%f", "%f")
+                """
+    # number of sample size used for fitting
+    samplesizes = [2500, 5000]
+    # number of fitting to do on each proc
+    fitperprocs = [4, 2]
+    # connect to db to record the fittings
+    cur, con = dbc.connect()
+    dbc.overwrite(cur, con, 'p_results')
+
+    for sample_size, fit_per_proc in zip(samplesizes, fitperprocs):
+        sample_per_proc = sample_size*fit_per_proc
+        num_samples_use = sample_per_proc*numtask
+
+        if num_samples_use > num_samples_total:
+            if rank == ROOT:
+                print 'Insufficient samples.'
+                print 'At least ', num_samples_use, 'samples needed'
+            MPI.Finalize()
+            sys.exit(1)
+
+        idx_per_proc = np.zeros(sample_per_proc).astype(int)
+
+        if rank == ROOT:
+            data_seq = np.arange(num_samples_total)
+            np.random.shuffle(data_seq)
+            data_seq_use = data_seq[:num_samples_use]
+            data_idx_ranks = data_seq_use.reshape((numtask, sample_per_proc))
+        else:
+            data_idx_ranks = []
+
+        idx_per_proc = comm.scatter(data_idx_ranks, root=ROOT)
+        data_per_proc = [-1]*sample_per_proc
+        for i, j in enumerate(idx_per_proc):
+            data_per_proc[i] = records[j]
+
+        for i in range(fit_per_proc):
+
+            data_to_fit = data_per_proc[i*sample_size:(i+1)*sample_size]
+            data_to_fit = (tuple(data_to_fit),)
+
+            t4 = time.time()
+            methds = 'SLSQP'
+            # initial guess
+            paras = tuple([0.5]*NUM_STRATEGY) + (2.0, 0.5)
+
+            methds_opt = {'disp': False}
+            res = opt.minimize(cross_ent_loss,
+                               paras,
+                               args=data_to_fit,
+                               method=methds,
+                               # callback=callbackF,
+                               options=methds_opt)
+            t5 = time.time()
+
+            fitting = res.x
+            fitting[:5] = np.abs(fitting[:5])/sum(np.abs(fitting[:5]))
+            fit_time = t5-t4
+            sql_ins = (rank, sample_size, fit_time) + tuple(fitting)
+            sqlcmd = sqlstr % sql_ins
+            cur.execute(sqlcmd)
+            # print 'rank {0:2d}, fitting time {1:.1f}'.format(rank, fit_time)
+            # para_s = [rank, sample_size] +\
+            #     ['{:.3f}'.format(x) for x in fitting]
+            # print para_s
+
+        # fit_para_allranks = comm.gather(fitting, root=ROOT)
+        # fit_t_allranks = comm.gather(fit_time, root=ROOT)
+        # if rank == ROOT:
+        #     for i, fits in enumerate(fit_para_allranks):
+        #         print 'rank: ', i,\
+        #               ' paras: ', fits,\
+        #           'time: ', fit_t_allranks[i]
+    con.close()
+    MPI.Finalize()
