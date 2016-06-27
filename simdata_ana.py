@@ -119,12 +119,13 @@ if __name__ == "__main__":
                 "%d", "%d", "%f", "%f", "%f", "%f", "%f", "%f", "%f", "%f")
                 """
     # number of sample size used for fitting
-    samplesizes = [2500, 5000]
+    samplesizes = [100000]
     # number of fitting to do on each proc
-    fitperprocs = [4, 2]
+    fitperprocs = [1]
     # connect to db to record the fittings
     cur, con = dbc.connect()
-    dbc.overwrite(cur, con, 'strattag_fitting')
+    if rank == ROOT:
+        dbc.overwrite(cur, con, 'strattag_fitting')
 
     fitting_time_total = 0.0
     writetodb_time_total = 0.0
@@ -163,14 +164,14 @@ if __name__ == "__main__":
             t4 = time.time()
             methds = 'SLSQP'
             # initial guess
-            paras = tuple([0.5]*NUM_STRATEGY) + (2.0, 0.5)
+            paras = tuple([0.2]*NUM_STRATEGY) + (2.0, 0.5)
 
             methds_opt = {'disp': False}
             res = opt.minimize(cross_ent_loss,
                                paras,
                                args=data_to_fit,
                                method=methds,
-                               # callback=callbackF,
+                               callback=callbackF,
                                options=methds_opt)
             t5 = time.time()
 

@@ -29,7 +29,7 @@ if __name__ == '__main__':
                 beta) VALUES(
                 "%d", "%d", "%f", "%f", "%f", "%f", "%f")"""
     # number of trials
-    num_trial = 50000
+    num_trial = 100000
     # number of lottery mag e.g. 1-10
     # num_lott_mag = 20
     # lott_mag_start = 4.0
