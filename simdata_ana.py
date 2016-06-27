@@ -31,8 +31,10 @@ def prob_poke(coeff, alpha, beta, external):
     p5 = pfunc.winstayloseshift(history)
 
     est_p = np.dot(coeff, np.array([p1, p2, p3, p4, p5]))
-    assert np.all(np.log(est_p) < 0)
-    assert np.all(np.log(1.-est_p) < 0)
+    test1 = np.all(np.log(est_p) < 0)
+    test2 = np.all(np.log(1.-est_p) < 0)
+    if not test1 or not test2:
+        print esternal, est_p
     return est_p
 
 
