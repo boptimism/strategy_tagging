@@ -31,8 +31,10 @@ def prob_poke(coeff, alpha, beta, external):
     p5 = pfunc.winstayloseshift(history)
 
     est_p = np.dot(coeff, np.array([p1, p2, p3, p4, p5]))
-    assert np.all(np.log(est_p) < 0)
-    assert np.all(np.log(1.-est_p) < 0)
+    test1 = np.all(np.log(est_p) < 0)
+    test2 = np.all(np.log(1.-est_p) < 0)
+    if not test1 or not test2:
+        print esternal, est_p
     return est_p
 
 
@@ -119,9 +121,9 @@ if __name__ == "__main__":
                 "%d", "%d", "%f", "%f", "%f", "%f", "%f", "%f", "%f", "%f")
                 """
     # number of sample size used for fitting
-    samplesizes = [2500, 5000]
+    samplesizes = [10000, 7500, 5000, 2500, 1000, 750, 500, 250, 100]
     # number of fitting to do on each proc
-    fitperprocs = [4, 2]
+    fitperprocs = [1, 1, 2, 4, 10, 10, 20, 40, 100]
     # connect to db to record the fittings
     cur, con = dbc.connect()
     dbc.overwrite(cur, con, 'strattag_fitting')
