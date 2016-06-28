@@ -2,6 +2,7 @@ import simdata_gen_func as sfunc
 from scipy import stats
 import numpy as np
 import db_connect as dbc
+import json
 
 
 def trial_gen(prior, history,
@@ -50,16 +51,10 @@ if __name__ == '__main__':
     pre_reward = 0.0
     pre_config = records[0][1:3] + (pre_poke, pre_reward)
     pre_trialid = 1
-    p_utility = 0.9
-    p_rest = (1-p_utility)*0.25
-    prior = {'randombet': p_rest,
-             'sameport': p_rest,
-             'samebet': p_rest,
-             'winstayloseshift': p_rest,
-             'utility': p_utility}
 
-    # alpha = 1.5
-    # beta = 1.0
+    with open('inputs.json', 'r') as f:
+        para = json.load(f)
+    prior = para['prior']
 
     sqlstr = """INSERT INTO strattag_pokereward(
                 trialid,

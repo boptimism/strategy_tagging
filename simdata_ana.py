@@ -1,6 +1,7 @@
 import sys
 import argparse
 import time
+import json
 import db_connect as dbc
 import simdata_postproc_func as pfunc
 import numpy as np
@@ -169,14 +170,15 @@ if __name__ == "__main__":
             "%f", "%f", "%f"
             )
             """
-    # number of sample size used for fitting
-    samplesizes = [2500]
-    # number of fitting to do on each proc
-    fitperprocs = [1]
     # connect to db to record the fittings
     cur, con = dbc.connect()
     if rank == ROOT and overwriteSQL:
         dbc.overwrite(cur, con, 'strattag_fitting')
+
+    with open('./inputs.json', 'r') as f:
+        para = json.load(f)
+    samplesizes = para['samplesizes']
+    fitperprocs = para['fitperprocs']
 
     for sample_size, fit_per_proc in zip(samplesizes, fitperprocs):
         # split between training and testing
@@ -240,7 +242,7 @@ if __name__ == "__main__":
 
             # computing cross entropy losses
             fitting = res.x
-            # fitting[:5] = np.abs(fitting[:5])/sum(np.abs(fitting[:5]))
+            fitting[:5] = np.abs(fitting[:5])/sum(np.abs(fitting[:5]))
             train_loss = cross_ent_loss(fitting, data_to_fit[0])
             print 'train size: {0:d},\
                    train-loss: {1:.6g}'.format(num_train_samples, train_loss)
