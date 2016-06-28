@@ -54,6 +54,8 @@ def samebet(history):
         probs[cur_sureport] = 1.0
     elif pre_poke == pre_lottport:
         probs[cur_lottport] = 1.0
+    else:
+        pass
 
     return np.array(probs)
 
@@ -73,4 +75,6 @@ def winstayloseshift(history):
             probs[cur_lottport] = 1.0
         else:
             probs[cur_sureport] = 1.0
+    else:
+        pass
     return np.array(probs)

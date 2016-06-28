@@ -34,11 +34,12 @@ def trial_gen(prior, history,
 
 if __name__ == '__main__':
     cur, con = dbc.connect()
-    try:
-        cur.execute("DELETE FROM strattag_pokereward")
-        con.commit()
-    except:
-        con.rollback()
+    dbc.overwrite(cur, con, 'strattag_pokereward')
+    # try:
+    #     cur.execute("DELETE FROM strattag_pokereward")
+    #     con.commit()
+    # except:
+    #     con.rollback()
 
     sqlcmd = 'SELECT * FROM strattag_config'
     cur.execute(sqlcmd)
@@ -49,12 +50,13 @@ if __name__ == '__main__':
     pre_reward = 0.0
     pre_config = records[0][1:3] + (pre_poke, pre_reward)
     pre_trialid = 1
-
-    prior = {'randombet': 0.15,
-             'sameport': 0.05,
-             'samebet': 0.1,
-             'winstayloseshift': 0.075,
-             'utility': 0.625}
+    p_utility = 0.9
+    p_rest = (1-p_utility)*0.25
+    prior = {'randombet': p_rest,
+             'sameport': p_rest,
+             'samebet': p_rest,
+             'winstayloseshift': p_rest,
+             'utility': p_utility}
 
     # alpha = 1.5
     # beta = 1.0

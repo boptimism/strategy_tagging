@@ -23,6 +23,7 @@ def connect():
 def overwrite(cur, con, tbl_name):
     try:
         cur.execute("DELETE FROM %s" % tbl_name)
+        cur.execute("ALTER TABLE %s AUTO_INCREMENT=1" % tbl_name)
         con.commit()
     except:
         con.rollback()

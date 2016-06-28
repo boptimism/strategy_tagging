@@ -13,12 +13,13 @@ if __name__ == '__main__':
 
     cur, con = dbc.connect()
     # reset the table
-    try:
-        cur.execute("DELETE FROM strattag_config")
-        cur.execute("ALTER TABLE strattag_config AUTO_INCREMENT = 1")
-        con.commit()
-    except:
-        con.rollback()
+    dbc.overwrite(cur, con, 'strattag_config')
+    # try:
+    #     cur.execute("DELETE FROM strattag_config")
+    #     cur.execute("ALTER TABLE strattag_config AUTO_INCREMENT = 1")
+    #     con.commit()
+    # except:
+    #     con.rollback()
 
     sqlstr = """INSERT INTO strattag_config(
                 surebet_port,
